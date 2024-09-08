@@ -5,6 +5,14 @@ from pydantic import BaseModel
 
 
 class Node(BaseModel):
+    def is_zero(self) -> bool:
+        return False
+
+    def is_one(self) -> bool:
+        return False
+
+    def is_constant(self) -> bool:
+        return False
     def __str__(self) -> str:
         raise NotImplementedError
 
@@ -12,13 +20,23 @@ class Node(BaseModel):
 class Constant(Node):
     value: float
 
+
+    def is_zero(self) -> bool:
+        return self.value == 0
+
+    def is_one(self) -> bool:
+        return self.value == 1
+
+    def is_constant(self) -> bool:
+        return True
     def __str__(self) -> str:
         return str(self.value)
 
 
 class Symbol(Node):
     name: str
-
+    def is_constant(self) -> bool:
+        return False
     def __str__(self) -> str:
         return self.name
 
