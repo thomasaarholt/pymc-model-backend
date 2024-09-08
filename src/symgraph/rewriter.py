@@ -131,65 +131,92 @@ class Differentiator:
         return differentiate_node(node, var)
 
 
+def product_rule(left: Node, right: Node, var: Symbol) -> Node:
+    return Add(
+        left=Multiply(left=differentiate_node(left, var), right=right),
+        right=Multiply(left=left, right=differentiate_node(right, var)),
+    )
+
+
+def quotient_rule(left: Node, right: Node, var: Symbol) -> Node:
+    numerator = Subtract(
+        left=Multiply(left=differentiate_node(left, var), right=right),
+        right=Multiply(left=left, right=differentiate_node(right, var)),
+    )
+    denominator = Multiply(left=right, right=right)
+    return Divide(left=numerator, right=denominator)
+
+
+def power_rule(base: Node, exponent: Node, var: Symbol) -> Node:
+    if isinstance(exponent, Constant):
+        # Power rule: d(u^n)/dx = n * u^(n-1) * du/dx
+        return Multiply(
+            left=Multiply(
+                left=exponent,
+                right=Exponentiation(
+                    left=base, right=Constant(value=exponent.value - 1)
+                ),
+            ),
+            right=differentiate_node(base, var),
+        )
+    else:
+        # Chain rule for non-constant exponents: d(u^v)/dx = u^v * (v' * ln(u) + v * (u'/u))
+        return Multiply(
+            left=Exponentiation(left=base, right=exponent),
+            right=Add(
+                left=Multiply(
+                    left=differentiate_node(exponent, var),
+                    right=Function(operator="ln", arguments=[base]),
+                ),
+                right=Multiply(
+                    left=exponent,
+                    right=Divide(left=differentiate_node(base, var), right=base),
+                ),
+            ),
+        )
+
+
+def differentiate_symbol(symbol: Symbol, var: Symbol) -> Node:
+    return Constant(value=1) if symbol.name == var.name else Constant(value=0)
+
+
+def differentiate_constant(constant: Constant, var: Symbol) -> Node:
+    return Constant(value=0)
+
+
 def differentiate_node(node: Node, var: Symbol) -> Node:
     match node:
         case Add(left=left, right=right):
+            # Sum rule: d(u + v)/dx = du/dx + dv/dx
             return Add(
                 left=differentiate_node(left, var), right=differentiate_node(right, var)
             )
 
         case Subtract(left=left, right=right):
+            # Difference rule: d(u - v)/dx = du/dx - dv/dx
             return Subtract(
                 left=differentiate_node(left, var), right=differentiate_node(right, var)
             )
 
         case Multiply(left=left, right=right):
-            return Add(
-                left=Multiply(left=differentiate_node(left, var), right=right),
-                right=Multiply(left=left, right=differentiate_node(right, var)),
-            )
+            # Product rule: d(u * v)/dx = u' * v + u * v'
+            return product_rule(left, right, var)
 
         case Divide(left=left, right=right):
-            numerator = Subtract(
-                left=Multiply(left=differentiate_node(left, var), right=right),
-                right=Multiply(left=left, right=differentiate_node(right, var)),
-            )
-            denominator = Multiply(left=right, right=right)
-            return Divide(left=numerator, right=denominator)
+            # Quotient rule: d(u / v)/dx = (u' * v - u * v') / v^2
+            return quotient_rule(left, right, var)
 
         case Exponentiation(left=base, right=exponent):
-            if isinstance(exponent, Constant):
-                return Multiply(
-                    left=Multiply(
-                        left=exponent,
-                        right=Exponentiation(
-                            left=base, right=Constant(value=exponent.value - 1)
-                        ),
-                    ),
-                    right=differentiate_node(base, var),
-                )
-            else:
-                return Multiply(
-                    left=Exponentiation(left=base, right=exponent),
-                    right=Add(
-                        left=Multiply(
-                            left=differentiate_node(exponent, var),
-                            right=Function(operator="ln", arguments=[base]),
-                        ),
-                        right=Multiply(
-                            left=exponent,
-                            right=Divide(
-                                left=differentiate_node(base, var), right=base
-                            ),
-                        ),
-                    ),
-                )
+            # Power rule or chain rule for exponentiation
+            return power_rule(base, exponent, var)
 
-        case Symbol(operator=name):
-            return Constant(value=1) if name == var.name else Constant(value=0)
+        case Symbol():
+            # Symbol differentiation (dx/dx = 1, dy/dx = 0)
+            return differentiate_symbol(node, var)
 
         case Constant():
-            return Constant(value=0)
+            # Constant differentiation (d(constant)/dx = 0)
+            return differentiate_constant(node, var)
 
         case _:
             raise NotImplementedError(f"Differentiation not supported for node: {node}")
