@@ -1,13 +1,14 @@
+# expression.py
 from __future__ import annotations
-from dataclasses import dataclass
+
+from pydantic import BaseModel
 
 
-class Node:
+class Node(BaseModel):
     def __str__(self) -> str:
         raise NotImplementedError
 
 
-@dataclass
 class Constant(Node):
     value: float
 
@@ -15,7 +16,6 @@ class Constant(Node):
         return str(self.value)
 
 
-@dataclass
 class Symbol(Node):
     name: str
 
@@ -23,10 +23,16 @@ class Symbol(Node):
         return self.name
 
 
-@dataclass
 class Operation(Node):
     operator: str
-    operands: list[Node]
+
+    @property
+    def operands(self) -> list[Node]:
+        raise NotImplementedError
+
+    @operands.setter
+    def operands(self, new_operands: list[Node]):
+        raise NotImplementedError
 
     def __str__(self) -> str:
         operand_str = f" {self.operator} ".join(map(str, self.operands))
@@ -34,41 +40,39 @@ class Operation(Node):
 
 
 class BinaryOperation(Operation):
-    @property
-    def left(self) -> Node:
-        return self.operands[0]
+    left: Node
+    right: Node
 
     @property
-    def right(self) -> Node:
-        return self.operands[-1]
+    def operands(self) -> list[Node]:
+        return [self.left, self.right]
 
+    @operands.setter
+    def operands(self, new_operands: list[Node]):
+        self.left, self.right = new_operands
 
 class Add(BinaryOperation):
-    def __init__(self, left: Node, right: Node) -> None:
-        super().__init__("+", [left, right])
-
+    operator: str = "+"
 
 class Subtract(BinaryOperation):
-    def __init__(self, left: Node, right: Node) -> None:
-        super().__init__("-", [left, right])
+    operator: str = "-"
 
 
 class Multiply(BinaryOperation):
-    def __init__(self, left: Node, right: Node) -> None:
-        super().__init__("*", [left, right])
+    operator: str = "*"
 
 
 class Divide(BinaryOperation):
-    def __init__(self, left: Node, right: Node) -> None:
-        super().__init__("/", [left, right])
+    operator: str = "/"
 
 
 class Exponentiation(BinaryOperation):
-    def __init__(self, base: Node, exponent: Node) -> None:
-        super().__init__("^", [base, exponent])
+    operator: str = "**"
 
 
 class Function(Operation):
+    arguments: list[Node]
+
     def __str__(self) -> str:
         arg_str = ", ".join(map(str, self.operands))
         return f"{self.operator}({arg_str})"

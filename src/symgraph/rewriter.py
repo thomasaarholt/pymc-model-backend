@@ -1,3 +1,4 @@
+# rewriter.py
 from symgraph.expression import (
     Add,
     Constant,
@@ -47,16 +48,16 @@ class Rewriter:
 def simplify_multiply_by_zero(node: Node) -> Node:
     if isinstance(node, Multiply):
         if isinstance(node.left, Constant) and node.left.value == 0:
-            return Constant(0)
+            return Constant(value=0)
         if isinstance(node.right, Constant) and node.right.value == 0:
-            return Constant(0)
+            return Constant(value=0)
     return node
 
 
 def simplify_divide_by_zero_numerator(node: Node) -> Node:
     if isinstance(node, Divide):
         if isinstance(node.left, Constant) and node.left.value == 0:
-            return Constant(0)
+            return Constant(value=0)
     return node
 
 
@@ -89,7 +90,7 @@ def simplify_exponentiation(node: Node) -> Node:
     if isinstance(node, Exponentiation):
         if isinstance(node.right, Constant):
             if node.right.value == 0:
-                return Constant(1)
+                return Constant(value=1)
             if node.right.value == 1:
                 return node.left
     return node
@@ -105,7 +106,7 @@ def simplify_fractional_multiplication(node: Node) -> Node:
     elif isinstance(node, Divide):
         # Check if division comes first and is then multiplied (b * a/a = b)
         if node.left == node.right:
-            return Constant(1)  # Simplify a / a = 1
+            return Constant(value=1)  # Simplify a / a = 1
     return node
 
 
@@ -132,51 +133,63 @@ class Differentiator:
 
 def differentiate_node(node: Node, var: Symbol) -> Node:
     match node:
-        case Add(name, operands):
-            left, right = operands
-            return Add(differentiate_node(left, var), differentiate_node(right, var))
-        
-        case Subtract(name, operands):
-            left, right = operands
-            return Subtract(differentiate_node(left, var), differentiate_node(right, var))
-        
-        case Multiply(name, operands):
-            left, right = operands
+        case Add(left=left, right=right):
             return Add(
-                Multiply(differentiate_node(left, var), right),
-                Multiply(left, differentiate_node(right, var)),
+                left=differentiate_node(left, var), right=differentiate_node(right, var)
             )
-        
-        case Divide(name, operands):
-            left, right = operands
+
+        case Subtract(left=left, right=right):
+            return Subtract(
+                left=differentiate_node(left, var), right=differentiate_node(right, var)
+            )
+
+        case Multiply(left=left, right=right):
+            return Add(
+                left=Multiply(left=differentiate_node(left, var), right=right),
+                right=Multiply(left=left, right=differentiate_node(right, var)),
+            )
+
+        case Divide(left=left, right=right):
             numerator = Subtract(
-                Multiply(differentiate_node(left, var), right),
-                Multiply(left, differentiate_node(right, var)),
+                left=Multiply(left=differentiate_node(left, var), right=right),
+                right=Multiply(left=left, right=differentiate_node(right, var)),
             )
-            denominator = Multiply(right, right)
-            return Divide(numerator, denominator)
-        
-        case Exponentiation(name, operands):
-            base, exponent = operands
+            denominator = Multiply(left=right, right=right)
+            return Divide(left=numerator, right=denominator)
+
+        case Exponentiation(left=base, right=exponent):
             if isinstance(exponent, Constant):
                 return Multiply(
-                    Multiply(exponent, Exponentiation(base, Constant(exponent.value - 1))),
-                    differentiate_node(base, var)
+                    left=Multiply(
+                        left=exponent,
+                        right=Exponentiation(
+                            left=base, right=Constant(value=exponent.value - 1)
+                        ),
+                    ),
+                    right=differentiate_node(base, var),
                 )
             else:
                 return Multiply(
-                    Exponentiation(base, exponent),
-                    Add(
-                        Multiply(differentiate_node(exponent, var), Function("ln", [base])),
-                        Multiply(exponent, Divide(differentiate_node(base, var), base)),
+                    left=Exponentiation(left=base, right=exponent),
+                    right=Add(
+                        left=Multiply(
+                            left=differentiate_node(exponent, var),
+                            right=Function(operator="ln", arguments=[base]),
+                        ),
+                        right=Multiply(
+                            left=exponent,
+                            right=Divide(
+                                left=differentiate_node(base, var), right=base
+                            ),
+                        ),
                     ),
                 )
-        
-        case Symbol(name):
-            return Constant(1) if name == var.name else Constant(0)
-        
-        case Constant(_):
-            return Constant(0)
-        
+
+        case Symbol(operator=name):
+            return Constant(value=1) if name == var.name else Constant(value=0)
+
+        case Constant():
+            return Constant(value=0)
+
         case _:
             raise NotImplementedError(f"Differentiation not supported for node: {node}")
