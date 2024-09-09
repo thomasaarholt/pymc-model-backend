@@ -1,6 +1,7 @@
 # Example usage
+from symgraph.Differentiator import Differentiator
 from symgraph.expression import Multiply, Symbol
-from symgraph.rewriter import Differentiator, Rewriter, simplify_add_zero, simplify_multiply_by_one, simplify_multiply_by_zero
+from symgraph.rewriter import Rewriter, simplify_add_zero, simplify_multiply_by_one, simplify_multiply_by_zero
 
 
 a = Symbol("a")
