@@ -36,8 +36,7 @@ class Rewriter:
         # Now, apply the rules to the current node
         for rule in self.rules:
             simplified_node = rule(node)
-            if simplified_node is not node:
-                print("RESTART")
+            if simplified_node != node:
                 # If a simplification happened, restart to apply all rules on the new simplified node
                 return self._apply_rules_recursively(simplified_node)
 
