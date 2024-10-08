@@ -3,7 +3,9 @@ from symgraph.expression import (
     Add,
     Constant,
     Divide,
+    Exp,
     Exponentiation,
+    Ln,
     Multiply,
     Node,
     Operation,
@@ -124,6 +126,30 @@ def simplify_divide_with_common_factor(node: Node) -> Node:
     return node
 
 
+def simplify_ln_of_e_power(node: Node) -> Node:
+    """Simplify subtraction of zero: x - 0 = x."""
+    if isinstance(node, Ln):
+        if isinstance(node.operand, Exp):
+            return node.operand.operand
+    return node
+
+
+def simplify_e_power_of_ln(node: Node) -> Node:
+    """Simplify subtraction of zero: x - 0 = x."""
+    if isinstance(node, Exp):
+        if isinstance(node.operand, Ln):
+            return node.operand.operand
+    return node
+
+
+def simplify_ln_of_mul(node: Node) -> Node:
+    if isinstance(node, Ln):
+        mul_node = node.operand
+        if isinstance(mul_node, Multiply):
+            return Ln(mul_node.left) + Ln(mul_node.right)
+    return node
+
+
 all_rules = [
     simplify_multiply_by_zero,
     simplify_multiply_by_one,
@@ -133,6 +159,9 @@ all_rules = [
     simplify_divide_by_zero_numerator,
     simplify_fractional_multiplication,
     simplify_divide_with_common_factor,
+    simplify_ln_of_e_power,
+    simplify_e_power_of_ln,
+    simplify_ln_of_mul,
 ]
 
 rewriter = Rewriter(rules=all_rules)

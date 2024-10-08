@@ -16,7 +16,34 @@ from symgraph.expression import (
 from dataclasses import dataclass
 
 
+def is_constant_wrt(node: Node, var: Symbol) -> bool:
+    match node:
+        case Constant():
+            return True  # Constants are constant
+        case Symbol() if node == var:
+            return False  # Variable itself is not constant
+        case Symbol():
+            return True  # Other symbols are considered constants wrt `var`
+        case Add(left=left, right=right):
+            return is_constant_wrt(left, var) and is_constant_wrt(right, var)
+        case Subtract(left=left, right=right):
+            return is_constant_wrt(left, var) and is_constant_wrt(right, var)
+        case Multiply(left=left, right=right):
+            return is_constant_wrt(left, var) and is_constant_wrt(right, var)
+        case Divide(left=left, right=right):
+            return is_constant_wrt(left, var) and is_constant_wrt(right, var)
+        case Exp(operand=operand):
+            return is_constant_wrt(operand, var)
+        case Ln(operand=operand):
+            return is_constant_wrt(operand, var)
+        case _:
+            return False
+
+
 def differentiate_node(node: Node, var: Symbol) -> Node:
+    if is_constant_wrt(node, var):
+        return Constant(value=0)  # If the whole subtree is constant wrt `var`, return 0
+
     match node:
         case Add(left=left, right=right):
             # Sum rule: d(u + v)/dx = du/dx + dv/dx
@@ -85,7 +112,12 @@ def quotient_rule(left: Node, right: Node, var: Symbol) -> Node:
 
 
 def power_rule(base: Node, exponent: Node, var: Symbol) -> Node:
+    # Power rule: d(u^n)/dx = n * u^(n-1) * du/dx
     if isinstance(exponent, Constant):
+        if exponent.value == 0:
+            return Constant(value=0)  # d(c^0)/dx = 0
+        elif exponent.value == 1:
+            return differentiate_node(base, var)  # d(c^1)/dx = du/dx
         # Power rule: d(u^n)/dx = n * u^(n-1) * du/dx
         return Multiply(
             left=Multiply(

@@ -14,6 +14,9 @@ class Node:
     def evaluate(self, values: Mapping[str, ArrayLike]) -> NDArray[Any]:
         raise NotImplementedError
 
+    def to_latex(self) -> str:
+        raise NotImplementedError("to_latex not implemented for this node type")
+
     def _colorize(self, text: str, level: int) -> str:
         """Apply color based on the node's level in the tree."""
         color = COLORS[level % len(COLORS)]  # Cycle through the 6 colors
@@ -93,6 +96,10 @@ class Constant(Node):
         return np.array(self.value)
 
     @override
+    def to_latex(self) -> str:
+        return str(self.value)
+
+    @override
     def _str_with_indent(self, level: int) -> str:
         return self._colorize(f"{'    ' * level}{self.value}", level)
 
@@ -108,13 +115,22 @@ class Symbol(Node):
         return np.array(values[self.name])
 
     @override
+    def to_latex(self) -> str:
+        return self.name
+
+    @override
     def _str_with_indent(self, level: int) -> str:
         return self._colorize(f"{'    ' * level}{self.name}", level)
 
+    @override
+    def __eq__(self, other: object) -> bool:
+        """Compare the node with another Constant or numeric."""
+        if isinstance(other, Symbol):
+            return self.name == other.name
+        return False
+
 
 class Operation(Node):
-    operator: str
-
     @property
     def operands(self) -> list[Node]:
         raise NotImplementedError(f"Not implemented for {type(self)}")
@@ -140,8 +156,7 @@ class BinaryOperation(Operation):
 
     @override
     def _str_with_indent(self, level: int) -> str:
-        # Print the operator and recursively print left and right with indentation
-        result = self._colorize(f"{'    ' * level}{self.operator}\n", level)
+        result = self._colorize(f"{'    ' * level}{type(self).__name__}\n", level)
         result += self.left._str_with_indent(level + 1) + "\n"
         result += self.right._str_with_indent(level + 1)
         return result
@@ -169,81 +184,94 @@ class UnaryOperation(Operation):
 
     @override
     def _str_with_indent(self, level: int) -> str:
-        result = self._colorize(f"{'    ' * level}{self.operator}\n", level)
+        result = self._colorize(f"{'    ' * level}{type(self).__name__}\n", level)
         result += self.operand._str_with_indent(level + 1) + "\n"
         return result
 
 
 class Add(BinaryOperation):
-    operator: str = "Add"
-
     @override
     def evaluate(self, values: Mapping[str, ArrayLike]) -> NDArray[Any]:
         return self.left.evaluate(values) + self.right.evaluate(values)
 
+    @override
+    def to_latex(self) -> str:
+        return f"{self.left.to_latex()} + {self.right.to_latex()}"
+
 
 class Subtract(BinaryOperation):
-    operator: str = "Subtract"
-
     @override
     def evaluate(self, values: Mapping[str, ArrayLike]) -> NDArray[Any]:
         return self.left.evaluate(values) - self.right.evaluate(values)
 
+    @override
+    def to_latex(self) -> str:
+        return f"{self.left.to_latex()} - {self.right.to_latex()}"
+
 
 class Multiply(BinaryOperation):
-    operator: str = "Multiply"
-
     @override
     def evaluate(self, values: Mapping[str, ArrayLike]) -> NDArray[Any]:
         return self.left.evaluate(values) * self.right.evaluate(values)
 
+    @override
+    def to_latex(self) -> str:
+        return f"{self.left.to_latex()} \\cdot {self.right.to_latex()}"
+
 
 class Divide(BinaryOperation):
-    operator: str = "Divide"
-
     @override
     def evaluate(self, values: Mapping[str, ArrayLike]) -> NDArray[Any]:
         return self.left.evaluate(values) / self.right.evaluate(values)
 
+    @override
+    def to_latex(self) -> str:
+        return f"\\frac{{{self.left.to_latex()}}}{{{self.right.to_latex()}}}"
+
 
 class Exponentiation(BinaryOperation):
-    operator: str = "Exponentiation"
+    @property
+    def base(self):
+        return self.left
+
+    @property
+    def exponent(self):
+        return self.right
 
     @override
     def evaluate(self, values: Mapping[str, ArrayLike]) -> NDArray[Any]:
-        return self.left.evaluate(values) ** self.right.evaluate(values)
-
-
-class Function(Operation):
-    arguments: list[Node]
+        return self.base.evaluate(values) ** self.exponent.evaluate(values)
 
     @override
-    def _str_with_indent(self, level: int) -> str:
-        result = self._colorize(f"{'    ' * level}{self.operator}\n", level)
-        for arg in self.arguments:
-            result += arg._str_with_indent(level + 1) + "\n"
-        return result
+    def to_latex(self) -> str:
+        return f"{self.base.to_latex()}^{{{self.exponent.to_latex()}}}"
 
 
 class Sqrt(UnaryOperation):
-    operator: str = "Sqrt"
-
     @override
     def evaluate(self, values: Mapping[str, ArrayLike]) -> NDArray[Any]:
         return np.sqrt(self.operand.evaluate(values))
 
+    @override
+    def to_latex(self) -> str:
+        return f"\\sqrt{{{self.operand.to_latex()}}}"
+
 
 class Exp(UnaryOperation):
-    operator: str = "Exp"
-
     @override
     def evaluate(self, values: Mapping[str, ArrayLike]) -> NDArray[Any]:
         return np.exp(self.operand.evaluate(values))
 
+    @override
+    def to_latex(self) -> str:
+        return f"e^{{{self.operand.to_latex()}}}"
+
 
 class Ln(UnaryOperation):
-    operator: str = "Ln"
-
     @override
     def evaluate(self, values: Mapping[str, ArrayLike]) -> NDArray[Any]:
         return np.log(self.operand.evaluate(values))
+
+    @override
+    def to_latex(self) -> str:
+        return f"\\ln({self.operand.to_latex()})"
