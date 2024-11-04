@@ -11,10 +11,25 @@ from symgraph.utils import COLORS, RESET_COLOR
 
 
 class Node:
+    """Base class for expression tree nodes in a computation graph."""
+
     def evaluate(self, values: Mapping[str, ArrayLike]) -> NDArray[Any]:
+        """Evaluates the node with given variable values.
+
+        Args:
+            values: Mapping of variable names to their values.
+
+        Returns:
+            Computed result as a numpy array.
+        """
         raise NotImplementedError
 
     def to_latex(self) -> str:
+        """Converts the node to LaTeX representation.
+
+        Returns:
+            LaTeX string representation of the node.
+        """
         raise NotImplementedError("to_latex not implemented for this node type")
 
     def _colorize(self, text: str, level: int) -> str:
@@ -23,9 +38,15 @@ class Node:
         return f"{color}{text}{RESET_COLOR}"
 
     def __str__(self) -> str:
+        """Returns string representation of the node."""
         return self._str_with_indent(0)
 
     def _str_with_indent(self, level: int) -> str:
+        """Creates indented string representation for pretty printing.
+
+        Args:
+            level: Current indentation level.
+        """
         raise NotImplementedError(f"Not implemented for {type(self)}")
 
     @override
@@ -38,52 +59,58 @@ class Node:
                 return self.value == other.value
         return id(self) == id(other)
 
-    # Addition
     def __add__(self, other: Node | float) -> Node:
+        """Addition operator implementation."""
         if isinstance(other, (int, float)):
             other = Constant(value=other)
         return Add(left=self, right=other)
 
     def __radd__(self, other: float) -> Node:
+        """Reverse addition operator implementation."""
         return Constant(value=other) + self
 
-    # Subtraction
     def __sub__(self, other: Node | float) -> Node:
+        """Subtraction operator implementation."""
         if isinstance(other, (int, float)):
             other = Constant(value=other)
         return Subtract(left=self, right=other)
 
     def __rsub__(self, other: float) -> Node:
+        """Reverse subtraction operator implementation."""
         return Constant(value=other) - self
 
-    # Multiplication
     def __mul__(self, other: Node | float) -> Node:
+        """Multiplication operator implementation."""
         if isinstance(other, (int, float)):
             other = Constant(value=other)
         return Multiply(left=self, right=other)
 
     def __rmul__(self, other: float) -> Node:
+        """Reverse multiplication operator implementation."""
         return Constant(value=other) * self
 
-    # Division
     def __truediv__(self, other: Node | float) -> Node:
+        """Division operator implementation."""
         if isinstance(other, (int, float)):
             other = Constant(value=other)
         return Divide(left=self, right=other)
 
     def __rtruediv__(self, other: float) -> Node:
+        """Reverse division operator implementation."""
         return Constant(value=other) / self
 
-    # Exponentiation
     def __pow__(self, other: Node | float) -> Node:
+        """Exponentiation operator implementation."""
         if isinstance(other, (int, float)):
             other = Constant(value=other)
         return Exponentiation(left=self, right=other)
 
     def __rpow__(self, other: float) -> Node:
+        """Reverse exponentiation operator implementation."""
         return Constant(value=other) ** self
 
     def __neg__(self) -> Node:
+        """Unary negation operator implementation."""
         return -1 * self
 
 
