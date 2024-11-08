@@ -6,11 +6,8 @@ authors = [
     { name = "Thomas Aarholt", email = "thomasaarholt@gmail.com" }
 ]
 dependencies = [
-    "ipykernel>=6.29.5",
     "numpy>=2.1.1",
     "pydantic>=2.9.0",
-    "pytest>=8.3.2",
-    "ruff>=0.6.4",
 ]
 readme = "README.md"
 requires-python = ">= 3.12"
@@ -28,3 +25,9 @@ allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/symgraph"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.2",
+    "ruff>=0.6.4",
+]

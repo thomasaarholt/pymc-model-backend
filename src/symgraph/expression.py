@@ -1,6 +1,7 @@
 # expression.py
 from __future__ import annotations
 from collections.abc import Mapping
+import math
 from typing import Any, override
 
 import numpy as np
@@ -8,6 +9,24 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from symgraph.utils import COLORS, RESET_COLOR
+
+type IntoNode = Node | float
+
+
+def parse_into_node(into_node: IntoNode) -> Node:
+    """
+    Convert an IntoNode type into a Node type.
+    If input is not already a Node, wrap it in a Constant node.
+
+    Args:
+        into_node (IntoNode): Value to be converted to Node
+
+    Returns:
+        Node: Either the original Node or a new Constant node
+    """
+    if not isinstance(into_node, Node):
+        return Constant(into_node)
+    return into_node
 
 
 class Node:
@@ -81,6 +100,13 @@ class Node:
 
     def __mul__(self, other: Node | float) -> Node:
         """Multiplication operator implementation."""
+        if self == -1 and other == -1:
+            return Constant(1)
+        if self == -1:
+            return Negation(other)
+        elif other == -1:
+            return Negation(self)
+
         if isinstance(other, (int, float)):
             other = Constant(value=other)
         return Multiply(left=self, right=other)
@@ -131,9 +157,33 @@ class Constant(Node):
         return self._colorize(f"{'    ' * level}{self.value}", level)
 
 
+class SymbolicConstant(Constant):
+    """Special symbols like pi and e"""
+
+    def __init__(self, symbol: str, value: float):
+        self.symbol = symbol
+        self.value = value
+
+    @override
+    def evaluate(self, values: Mapping[str, ArrayLike]) -> NDArray[Any]:
+        return np.array(self.value)
+
+    @override
+    def to_latex(self) -> str:
+        return self.symbol
+
+    @override
+    def _str_with_indent(self, level: int) -> str:
+        return self._colorize(f"{'    ' * level}{self.symbol}", level)
+
+
+Pi = SymbolicConstant("π", math.pi)
+
+
 class Symbol(Node):
-    def __init__(self, name: str):
+    def __init__(self, name: str, symbol: str | None = None):
         self.name = name
+        self.symbol = symbol
 
     @override
     def evaluate(self, values: Mapping[str, ArrayLike]) -> NDArray[Any]:
@@ -143,7 +193,7 @@ class Symbol(Node):
 
     @override
     def to_latex(self) -> str:
-        return self.name
+        return self.symbol if self.symbol is not None else self.name
 
     @override
     def _str_with_indent(self, level: int) -> str:
@@ -163,14 +213,51 @@ class Operation(Node):
         raise NotImplementedError(f"Not implemented for {type(self)}")
 
     @operands.setter
-    def operands(self, new_operands: list[Node]) -> None:
+    def operands(self, new_operands: list[IntoNode]) -> None:
         raise NotImplementedError(f"Not implemented for {type(self)}")
 
 
+class MonoOperation(Operation):
+    def __init__(self, operand: IntoNode):
+        self.operand = parse_into_node(operand)
+
+    @property
+    @override
+    def operands(self) -> list[Node]:
+        return [self.operand]
+
+    @operands.setter
+    def operands(self, new_operands: list[IntoNode]) -> None:
+        self.operand = parse_into_node(new_operands[0])
+
+    @override
+    def _str_with_indent(self, level: int) -> str:
+        result = self._colorize(f"{'    ' * level}{type(self).__name__}\n", level)
+        result += self.operand._str_with_indent(level + 1)
+        return result
+
+
+class Negation(MonoOperation):
+    @override
+    def evaluate(self, values: Mapping[str, ArrayLike]) -> NDArray[Any]:
+        return -self.operand.evaluate(values)
+
+    @override
+    def to_latex(self) -> str:
+        operand = self.operand.to_latex()
+        base = (
+            f"({operand})"
+            if isinstance(self.operand, Operation)
+            and not isinstance(self.operand, Exponentiation)
+            else f"{operand}"
+        )
+        return f"-{base}"
+
+
 class BinaryOperation(Operation):
-    def __init__(self, left: Node, right: Node):
-        self.left = left
-        self.right = right
+    def __init__(self, left: IntoNode, right: IntoNode):
+        self.left = parse_into_node(left)
+        self.right = parse_into_node(right)
 
     @property
     @override
@@ -178,8 +265,8 @@ class BinaryOperation(Operation):
         return [self.left, self.right]
 
     @operands.setter
-    def operands(self, new_operands: list[Node]) -> None:
-        self.left, self.right = new_operands
+    def operands(self, new_operands: list[IntoNode]) -> None:
+        self.left, self.right = [parse_into_node(operand) for operand in new_operands]
 
     @override
     def _str_with_indent(self, level: int) -> str:
@@ -190,24 +277,22 @@ class BinaryOperation(Operation):
 
 
 class UnaryOperation(Operation):
-    def __init__(self, operand: Node):
-        self.operand = operand
+    def __init__(self, operand: IntoNode):
+        self.operand: Node = parse_into_node(operand)
 
     @override
     def evaluate(self, values: Mapping[str, ArrayLike]) -> NDArray[Any]:
         raise NotImplementedError
 
-    def diff(self, var: "Symbol") -> "Node":
-        raise NotImplementedError
-
     @property
     @override
     def operands(self) -> list[Node]:
+        self.operand
         return [self.operand]
 
     @operands.setter
-    def operands(self, new_operands: list[Node]):
-        self.operand = new_operands[0]
+    def operands(self, new_operands: list[IntoNode]):
+        self.operand = parse_into_node(new_operands[0])
 
     @override
     def _str_with_indent(self, level: int) -> str:
@@ -271,7 +356,10 @@ class Exponentiation(BinaryOperation):
 
     @override
     def to_latex(self) -> str:
-        return f"{self.base.to_latex()}^{{{self.exponent.to_latex()}}}"
+        base = self.base.to_latex()
+        base = f"({base})" if isinstance(self.base, Operation) else f"{base}"
+        exp = f"{{{self.exponent.to_latex()}}}"
+        return f"{base}^{exp}"
 
 
 class Sqrt(UnaryOperation):

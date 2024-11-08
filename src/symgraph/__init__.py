@@ -1,12 +1,13 @@
-from symgraph.differentiator import Differentiator
+from symgraph.differentiator import differentiate_node
 from symgraph.expression import (
+    Node,
     Constant,
+    Symbol,
+    Add,
+    Subtract,
+    Multiply,
     Divide,
     Exponentiation,
-    Multiply,
-    Node,
-    Subtract,
-    Symbol,
     Sqrt,
     Ln,
     Exp,
@@ -14,25 +15,22 @@ from symgraph.expression import (
 
 from symgraph.rewriter import (
     Rewriter,
-    simplify_add_zero,
-    simplify_multiply_by_one,
-    simplify_multiply_by_zero,
+    rewriter,
 )
 
 __all__ = [
+    "Node",
     "Constant",
+    "Add",
+    "Multiply",
     "Divide",
     "Exponentiation",
-    "Multiply",
-    "Node",
     "Subtract",
     "Symbol",
     "Sqrt",
     "Ln",
     "Exp",
-    "Differentiator",
+    "differentiate_node",
     "Rewriter",
-    "simplify_add_zero",
-    "simplify_multiply_by_one",
-    "simplify_multiply_by_zero",
+    "rewriter",
 ]

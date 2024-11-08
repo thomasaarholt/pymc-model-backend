@@ -21,8 +21,8 @@ from typing import Callable
 class Rewriter:
     rules: list[Callable[[Node], Node]]
 
-    def __call__(self, node: Node) -> Node:
-        simplified_node = node
+    def __call__(self, expression: Node) -> Node:
+        simplified_node = expression
         while True:
             new_node = self._apply_rules_recursively(simplified_node)
             if new_node == simplified_node:
@@ -54,6 +54,7 @@ def simplify_multiply_by_zero(node: Node) -> Node:
 
 
 def simplify_divide_by_zero_numerator(node: Node) -> Node:
+    """Simplify dividing zero by anything: 0/x = 0."""
     if isinstance(node, Divide):
         if isinstance(node.left, Constant) and node.left.value == 0:
             return Constant(value=0)
